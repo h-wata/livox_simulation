@@ -23,7 +23,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GAZEBO_CXX_FLAGS}")
 
 catkin_package(
   INCLUDE_DIRS include ${GAZEBO_INCLUDE_DIRS}
-  LIBRARIES arti_gazebo_laser_livox
+  LIBRARIES  arti_gazebo_laser_livox
   CATKIN_DEPENDS roscpp geometry_msgs sensor_msgs tf gazebo_ros
 )
 
