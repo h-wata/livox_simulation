@@ -76,11 +76,12 @@ private:
   std::vector<livox::RayData> double_ellipse_rays_;
 
   physics::CollisionPtr collision_ptr_;
+  physics::MultiRayShapePtr multi_rays_;
   std::vector<physics::CollisionPtr> collision_ptr_list_;
   ignition::math::Pose3d sensor_pose_;
   std::vector<float> vertical_ray_angles_;
   std::vector<float> horizontal_ray_angles_;
-  math::Vector3 ray_startpoint_;
+  ignition::math::Vector3d ray_startpoint_;
   sensor_msgs::PointCloud cloud_msg_;
   sensor_msgs::PointCloud2 pc2_msgs_;
 
