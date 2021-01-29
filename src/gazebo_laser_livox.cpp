@@ -281,9 +281,9 @@ void ArtiGazeboLaserLivox::PutLaserData(common::Time &_updateTime)
  // ROS_ERROR_STREAM("num ellipses: " << this->double_ellipse_rays_.size());
  // ROS_ERROR_STREAM("num ellipse rays: " << this->double_ellipse_rays_[0].getSizeLeftLowerQuadrant());
 
-  sensor_msgs::ChannelFloat32 intensity1 = sensor_msgs::ChannelFloat32();
-  intensity1.values.clear();
-  intensity1.name = "intensity";
+  // sensor_msgs::ChannelFloat32 intensity1 = sensor_msgs::ChannelFloat32();
+  // intensity1.values.clear();
+  // intensity1.name = "intensity";
 
   // Go throw every double-ellipse
   for (int j = 0; j < this->double_ellipse_rays_.size(); j++)
@@ -335,21 +335,25 @@ void ArtiGazeboLaserLivox::PutLaserData(common::Time &_updateTime)
 
     for(int c = 0; c < 4; c++)
     {
-      geometry_msgs::Point32 point, rot_point;
-      ignition::math::Quaterniond ray;
-      ignition::math::Vector3d axis;
-      ignition::math::Vector3d endpoint;
+      // ignition::math::Quaterniond ray;
+      // ignition::math::Vector3d axis;
+      // ignition::math::Vector3d endpoint;
+      // geometry_msgs::Point32 point, rot_point;
       // ROS_INFO_STREAM("c:" << c);
       for (int i = 0; i < quadrant_size[c]; i++)
       {
         // ROS_INFO_STREAM("i:" << i);
+        ignition::math::Quaterniond ray;
+        ignition::math::Vector3d axis;
+        ignition::math::Vector3d endpoint;
+        geometry_msgs::Point32 point, rot_point;
         float horizontal_ray_angle = horizon_angles[c][i];
         float vertical_ray_angle = vertical_angles[c][i];
-        // ROS_INFO_STREAM("Get angle: H:" << horizontal_ray_angle << " V:" << vertical_ray_angle );
         // Get distance of collision for the current ray
         quadrants[c][i]->GetIntersection(dist, entityName);
         // ROS_INFO_STREAM("Get Intersection Points:" << i << " dist:" << dist);
         // If the distance is below 1000.0, than a collision with an object happened
+        if(i == 0) dist = 10000; // when i=0 all dist value is same as first point
         if (dist < 999.9)
         {
           // ROS_INFO_STREAM("set Points:" << i << "dist:" << dist);
@@ -361,8 +365,15 @@ void ArtiGazeboLaserLivox::PutLaserData(common::Time &_updateTime)
           rot_point.x = point.x;
           rot_point.y = point.y * cos(this->current_rot_angle_) - point.z * sin(this->current_rot_angle_);
           rot_point.z = point.y * sin(this->current_rot_angle_) + point.z * cos(this->current_rot_angle_);
+          if(c==3){
+          if (i<3){
+              // ROS_INFO_STREAM("Get angle: H:" << horizontal_ray_angle << " V:" << vertical_ray_angle << " point " << point.x << " dist "<<dist);
+              ROS_INFO_STREAM(i << " point " << point.x << " dist "<<dist);
+              // ROS_INFO_STREAM("point x: :" << point.x << " y:" << point.y << " z" << point.z);
+          }
+          }
           // Use constant intensity-value
-          intensity1.values.push_back(1 - j*0.05);
+          // intensity1.values.push_back(1 - j*0.05);
           // Rotate the calculated point from the pointcloud with respect to the current rotation-angle.
           // Add point to pointcloud-list
           this->cloud_msg_.points.push_back(rot_point);
@@ -372,7 +383,7 @@ void ArtiGazeboLaserLivox::PutLaserData(common::Time &_updateTime)
         
         ray.Euler(ignition::math::Vector3d(0.0, -vertical_ray_angle, horizontal_ray_angle));
         // axis = offset.rot * ray * math::Vector3(1.0, 0.0, 0.0);
-        axis = ray * ignition::math::Vector3d(1.0, 0.0, 0.0);
+        // axis = ray * ignition::math::Vector3d(1.0, 0.0, 0.0);
         axis = offset.Rot() * ray * ignition::math::Vector3d(1.0, 0.0, 0.0);
         endpoint = (axis * this->max_range_) + offset.Pos();
 
@@ -384,7 +395,7 @@ void ArtiGazeboLaserLivox::PutLaserData(common::Time &_updateTime)
   // Add intensity-field to the pointcloud
   this->cloud_msg_.channels.push_back(intensity);
 
-  this->cloud1_msg_.channels.push_back(intensity1);
+  // this->cloud1_msg_.channels.push_back(intensity1);
   // Increment the current rotation angle
   this->current_rot_angle_ += this->rotation_increment_;
   // Don't exceed pi
@@ -447,6 +458,7 @@ bool ArtiGazeboLaserLivox::AddRayEllipseShape(double rotation_degrees)
   livox::RayData eight_ray_pattern;
 
   start.Set(0.0, 0.0, 0.0);
+  
 
   std::string parent_name = this->parent_ray_sensor_->ParentName();
   this->multi_rays_ = this->parent_ray_sensor_->LaserShape();
