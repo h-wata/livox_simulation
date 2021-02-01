@@ -11,7 +11,7 @@
   </xacro:macro>
 
 
-  <xacro:macro name="Livox_Mid_gazebo_sensor" params="visualize:=True update_rate:=10 min_range:=0.0 max_range:=30.0 resolution:=0.002 noise_mean:=0.0 noise_stddev:=0.01 topic_prefix:=livox_lidar/ name:=livox samples:=50 num_double_ellipses:=8 rotation_increment:=0.1">
+  <xacro:macro name="Livox_Mid_gazebo_sensor" params="visualize:=True update_rate:=10 min_range:=0.0 max_range:=30.0 resolution:=0.002 noise_mean:=0.0 noise_stddev:=0.01 topic_prefix:=livox_lidar/ name:=livox samples:=20 num_double_ellipses:=1 rotation_increment:=0.1">
     <gazebo reference="${name}">
       <sensor type="ray" name="laser_${name}">
         <pose>0 0 0 0 0 0</pose>
@@ -62,7 +62,7 @@
   </xacro:macro>
 
   <!-- ============================================= Livox_Mid40 macro ============================================= -->
-  <xacro:macro name="Livox_Mid40" params="visualize:=True update_rate:=10 min_range:=0.0 max_range:=30.0 resolution:=0.002 noise_mean:=0.0 noise_stddev:=0.01 topic_prefix:=livox_lidar/ name:=livox samples:=50 num_double_ellipses:=8 rotation_increment:=0.1">
+  <xacro:macro name="Livox_Mid40" params="visualize:=True update_rate:=10 min_range:=0.0 max_range:=30.0 resolution:=0.002 noise_mean:=0.0 noise_stddev:=0.01 topic_prefix:=livox_lidar/ name:=livox samples:=300 num_double_ellipses:=8 rotation_increment:=0.1">
     <link name="${name}_base">
       <xacro:null_inertial/>
       <!-- <inertial>

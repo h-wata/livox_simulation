@@ -89,8 +89,7 @@ void ArtiGazeboLaserLivox::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf
     ROS_INFO_NAMED("livox", "Livox-plugin parameter <numDoubleEllipses> is missing, defaults to 8");
     this->num_ellipses_ = 1;
   }
-  else
-    this->num_ellipses_ = this->sdf->Get<int>("numDoubleEllipses");
+  else this->num_ellipses_ = this->sdf->Get<int>("numDoubleEllipses");
 
   if (!this->sdf->HasElement("rotationIncrement"))
   {
@@ -338,19 +337,25 @@ void ArtiGazeboLaserLivox::PutLaserData(common::Time &_updateTime)
       // ROS_INFO_STREAM("c:" << c);
       for (int i = 0; i < quadrant_size[c]; i++)
       {
-        // ROS_INFO_STREAM("i:" << i);
         float horizontal_ray_angle = horizon_angles[c][i];
         float vertical_ray_angle = vertical_angles[c][i];
-        // Get distance of collision for the current ray
         
+        // ray.Euler(ignition::math::Vector3d(0.0, -vertical_ray_angle, horizontal_ray_angle));
+        ray.Euler(ignition::math::Vector3d(0.0, -vertical_ray_angle, horizontal_ray_angle));
+        // axis = offset.rot * ray * math::Vector3(1.0, 0.0, 0.0);
+        // axis = ray * ignition::math::Vector3d(1.0, 0.0, 0.0);
+        axis = offset.Rot() * ray * ignition::math::Vector3d(1.0, 0.0, 0.0);
+        endpoint = (axis * this->max_range_) + offset.Pos();
+
+        quadrants[c][i]->SetPoints(this->ray_startpoint_, endpoint);
+        if(i==0){
+        }
+        quadrants[c][i]->Update();
+        // Get distance of collision for the current ray
         quadrants[c][i]->GetIntersection(dist, entityName);
-        // quadrants[c][i]->GetIntersection(dist, entityName);
-        // ROS_INFO_STREAM("Get Intersection Points:" << i << " dist:" << dist);
         // If the distance is below 1000.0, than a collision with an object happened
-        // if(i == 0) dist = 10000; // when i=0 all dist value is same as first point
         if (dist < 999.9)
         {
-          // ROS_INFO_STREAM("set Points:" << i << "dist:" << dist);
           // Calculate point from ellipse-shaped-rays without considering the rotation-angle
           point.x = cos(vertical_ray_angle) * cos(horizontal_ray_angle) * dist;
           point.y = sin(horizontal_ray_angle) * cos(vertical_ray_angle) * dist;
@@ -359,27 +364,11 @@ void ArtiGazeboLaserLivox::PutLaserData(common::Time &_updateTime)
           rot_point.x = point.x;
           rot_point.y = point.y * cos(this->current_rot_angle_) - point.z * sin(this->current_rot_angle_);
           rot_point.z = point.y * sin(this->current_rot_angle_) + point.z * cos(this->current_rot_angle_);
-          if (i<2){ 
-              // ROS_INFO_STREAM("Get angle: H:" << horizontal_ray_angle << " V:" << vertical_ray_angle << " point " << point.x << " dist "<<dist); 
-              ROS_INFO_STREAM("C"<<c<<" ,I"<< i << " ,name" << quadrants[c][i]->GetName() << " ,dist "<<dist);
-          }
-        if (i>48){ 
-            // ROS_INFO_STREAM("Get angle: H:" << horizontal_ray_angle << " V:" << vertical_ray_angle << " point " << point.x << " dist "<<dist); 
-              ROS_INFO_STREAM("C"<<c<<" ,I"<< i << " ,name" << quadrants[c][i]->GetName() << " dist "<<dist);
-          }
           this->cloud_msg_.points.push_back(rot_point);
         }
         else
           has_prev_value = false;
         
-        ray.Euler(ignition::math::Vector3d(0.0, -vertical_ray_angle, horizontal_ray_angle));
-        // axis = offset.rot * ray * math::Vector3(1.0, 0.0, 0.0);
-        // axis = ray * ignition::math::Vector3d(1.0, 0.0, 0.0);
-        axis = offset.Rot() * ray * ignition::math::Vector3d(1.0, 0.0, 0.0);
-        endpoint = (axis * this->max_range_) + offset.Pos();
-
-        quadrants[c][i]->SetPoints(this->ray_startpoint_, endpoint);
-        quadrants[c][i]->Update();
       }
     }
   }
@@ -464,7 +453,6 @@ bool ArtiGazeboLaserLivox::AddRayEllipseShape(double rotation_degrees)
   this->collision_ptr_->SetInitialRelativePose(this->sensor_pose_);
 
   offset = this->collision_ptr_->RelativePose();
-  ROS_INFO_STREAM("Offset:" << offset.Pos() << offset.Rot());
   ignition::math::Vector3d offset_rot = offset.Rot().Euler();
   ray.Euler(offset_rot);
   axis = offset.Rot() * ray * ignition::math::Vector3d(1.0, 0.0, 0.0);
@@ -648,7 +636,6 @@ bool ArtiGazeboLaserLivox::AddRayEllipseShape(double rotation_degrees)
 //     ray3->SetPoints(start, end3);
 //     ray4->SetPoints(start, end4);
 
-    ROS_INFO_STREAM("Ray count:" << this->multi_rays_->RayCount());
     this->multi_rays_->Ray(0)->SetName("ray_sensor_1");
     this->multi_rays_->Ray(1)->SetName("ray_sensor_2");
     this->multi_rays_->Ray(2)->SetName("ray_sensor_3");
@@ -657,6 +644,7 @@ bool ArtiGazeboLaserLivox::AddRayEllipseShape(double rotation_degrees)
     rays_2.push_back(this->multi_rays_->Ray(1));
     rays_3.push_back(this->multi_rays_->Ray(2));
     rays_4.push_back(this->multi_rays_->Ray(3));
+    this->multi_rays_->Reset();
 //    this->rays_.push_back(ray1);
 //    this->rays_.push_back(ray2);
 //    this->rays_.push_back(ray3);
@@ -696,7 +684,6 @@ bool ArtiGazeboLaserLivox::AddRayEllipseShape(double rotation_degrees)
     // ROS_ERROR_STREAM("addLeftUpperQuadrant" << i);
     eight_ray_pattern.addLeftUpperQuadrant(rays_1[i]);
   }
-  ROS_INFO_STREAM("Complete Set Left Upper Quadrant" << beta_1_values.size());
 
   for (size_t i = 0; i < beta_3_values.size(); ++i)
   {
@@ -709,7 +696,6 @@ bool ArtiGazeboLaserLivox::AddRayEllipseShape(double rotation_degrees)
     //ROS_ERROR("addRightUpperQuadrant");
     eight_ray_pattern.addRightUpperQuadrant(rays_3[i]);
   }
-  ROS_INFO_STREAM("Complete Set Right Upper Quadrant" << beta_3_values.size());
   for (size_t i = 0; i < beta_2_values.size(); ++i)
   {
     this->horizontal_ray_angles_.push_back(beta_2_values[i]);
@@ -721,7 +707,6 @@ bool ArtiGazeboLaserLivox::AddRayEllipseShape(double rotation_degrees)
     //ROS_ERROR("addLeftLowerQuadrant");
     // this->rays_.push_back(rays_2[i]);
   }
-  ROS_INFO_STREAM("Complete Set Left LowerQuadrant" << beta_2_values.size());
 
   for (size_t i = 0; i < beta_4_values.size(); ++i)
   {
@@ -734,7 +719,6 @@ bool ArtiGazeboLaserLivox::AddRayEllipseShape(double rotation_degrees)
     // this->rays_.push_back(rays_4[i]);
     //ROS_ERROR("addRightLowerQuadrant");
   }
-  ROS_INFO_STREAM("Complete Set Right Lower Quadrant" << beta_4_values.size());
   //--------------------------------------------------------------------------------------------------------------------
 
   this->double_ellipse_rays_.push_back(eight_ray_pattern);
