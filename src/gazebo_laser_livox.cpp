@@ -271,7 +271,7 @@ void ArtiGazeboLaserLivox::PutLaserData(common::Time &_updateTime)
   #if GAZEBO_MAJOR_VERSION >= 8
   offset.Rot() = rot_only;
   #else
-  offset.rot() = rot_only;
+  offset.rot = rot_only;
   #endif
 
   bool has_prev_value = false;
@@ -536,21 +536,21 @@ bool ArtiGazeboLaserLivox::AddRayEllipseShape(double rotation_degrees)
     //       Therefore we need to map the y-axis of the ellipse to the Ray-z-axis and the x-axis of the ellipse to the
     //       -Ray-y-axis.
 
-    end1.X(1.0 + GetX(GetPose(offset)));
-    end1.Y(-ell_x1 + GetY(GetPose(offset)));
-    end1.Z(ell_y1 + GetZ(GetPose(offset)));
+    SetX(end1, 1.0 + GetX(GetPose(offset)));
+    SetY(end1, -ell_x1 + GetY(GetPose(offset)));
+    SetZ(end1, ell_y1 + GetZ(GetPose(offset)));
 
-    end2.X(1.0 + GetX(GetPose(offset)));
-    end2.Y(-ell_x2 + GetY(GetPose(offset)));
-    end2.Z(ell_y2 + GetZ(GetPose(offset)));
+    SetX(end2, 1.0 + GetX(GetPose(offset)));
+    SetY(end2, -ell_x2 + GetY(GetPose(offset)));
+    SetZ(end2, ell_y2 + GetZ(GetPose(offset)));
 
-    end3.X(1.0 + GetX(GetPose(offset)));
-    end3.Y(-ell_x3 + GetY(GetPose(offset)));
-    end3.Z(ell_y3 + GetZ(GetPose(offset)));
+    SetX(end3, 1.0 + GetX(GetPose(offset)));
+    SetY(end3, -ell_x3 + GetY(GetPose(offset)));
+    SetZ(end3, ell_y3 + GetZ(GetPose(offset)));
 
-    end4.X(1.0 + GetX(GetPose(offset)));
-    end4.Y(-ell_x4 + GetY(GetPose(offset)));
-    end4.Z(ell_y4 + GetZ(GetPose(offset)));
+    SetX(end4, 1.0 + GetX(GetPose(offset)));
+    SetY(end4, -ell_x4 + GetY(GetPose(offset)));
+    SetZ(end4, ell_y4 + GetZ(GetPose(offset)));
 
     double beta1 = (atan2(GetY(end1) - GetY(start), GetX(end1) - GetX(start)));
     double beta2 = (atan2(GetY(end2) - GetY(start), GetX(end2) - GetX(start)));
@@ -561,33 +561,32 @@ bool ArtiGazeboLaserLivox::AddRayEllipseShape(double rotation_degrees)
     double alpha3 = (atan2(GetZ(end3) - GetZ(start), GetX(end3) - GetX(start)));
     double alpha4 = (atan2(GetZ(end4) - GetZ(start), GetX(end4) - GetX(start)));
 
-    end1.X((1.0 + GetX(GetPose(offset))) * this->max_range_);
-    end1.Y((-ell_x1 + GetY(GetPose(offset))) * this->max_range_);
-    end1.Z((ell_y1 + GetZ(GetPose(offset))) * this->max_range_);
+    SetX(end1, (1.0 + GetX(GetPose(offset))) * this->max_range_);
+    SetY(end1, (-ell_x1 + GetY(GetPose(offset))) * this->max_range_);
+    SetZ(end1, (ell_y1 + GetZ(GetPose(offset))) * this->max_range_);
     // ray.Euler(V3(0.0 + GetX(offset_rot), -alpha1 + GetY(offset_rot), beta1 + GetZ(offset_rot)));
     SetEuler(ray, V3(0.0 + GetX(offset_rot), -alpha1 + GetY(offset_rot), beta1 + GetZ(offset_rot)));
     axis = GetQuaternion(offset) * ray * V3(1.0, 0.0, 0.0);
     end1 = (axis * this->max_range_) + GetPose(offset);
 
-    end2.X((1.0 + GetX(GetPose(offset))) * this->max_range_);
-    end2.Y((-ell_x2 + GetY(GetPose(offset))) * this->max_range_);
-    end2.Z((ell_y2 + GetZ(GetPose(offset))) * this->max_range_);
-    // ray.Euler(V3(0.0 + GetX(offset_rot), -alpha2 + GetY(offset_rot), beta2 + GetZ(offset_rot)));
-    SetEuler(ray, V3(0.0 + GetX(offset_rot), -alpha2 + GetY(offset_rot), beta2 + GetZ(offset_rot)));
+    SetX(end2, (1.0 + GetX(GetPose(offset))) * this->max_range_);
+    SetY(end2, (-ell_x2 + GetY(GetPose(offset))) * this->max_range_);
+    SetZ(end2, (ell_y2 + GetZ(GetPose(offset))) * this->max_range_);
+    // ray.Euler(V3(0.0 + GetX(offset_rot), -alpha2 + GetY(offset_rot), beta2 + GetZ(offset_rot))); SetEuler(ray, V3(0.0 + GetX(offset_rot), -alpha2 + GetY(offset_rot), beta2 + GetZ(offset_rot)));
     axis = GetQuaternion(offset) * ray * V3(1.0, 0.0, 0.0);
     end2 = (axis * this->max_range_) + GetPose(offset);
 
-    end3.X((1.0 + GetX(GetPose(offset))) * this->max_range_);
-    end3.Y((-ell_x3 + GetY(GetPose(offset))) * this->max_range_);
-    end3.Z((ell_y3 + GetZ(GetPose(offset))) * this->max_range_);
+    SetX(end3, (1.0 + GetX(GetPose(offset))) * this->max_range_);
+    SetY(end3, (-ell_x3 + GetY(GetPose(offset))) * this->max_range_);
+    SetZ(end3, (ell_y3 + GetZ(GetPose(offset))) * this->max_range_);
     // ray.Euler(V3(0.0 + GetX(offset_rot), -alpha3 + GetY(offset_rot), beta3 + GetZ(offset_rot)));
     SetEuler(ray, V3(0.0 + GetX(offset_rot), -alpha3 + GetY(offset_rot), beta3 + GetZ(offset_rot)));
     axis = GetQuaternion(offset) * ray * V3(1.0, 0.0, 0.0);
     end3 = (axis * this->max_range_) + GetPose(offset);
 
-    end4.X((1.0 + GetX(GetPose(offset))) * this->max_range_);
-    end4.Y((-ell_x4 + GetY(GetPose(offset))) * this->max_range_);
-    end4.Z((ell_y4 + GetZ(GetPose(offset))) * this->max_range_);
+    SetX(end4, (1.0 + GetX(GetPose(offset))) * this->max_range_);
+    SetY(end4, (-ell_x4 + GetY(GetPose(offset))) * this->max_range_);
+    SetZ(end4, (ell_y4 + GetZ(GetPose(offset))) * this->max_range_);
     // ray.Euler(V3(0.0 + GetX(offset_rot), -alpha4 + GetY(offset_rot), beta4 + GetZ(offset_rot)));
     SetEuler(ray, V3(0.0 + GetX(offset_rot), -alpha4 + GetY(offset_rot), beta4 + GetZ(offset_rot)));
     axis = GetQuaternion(offset) * ray * V3(1.0, 0.0, 0.0);

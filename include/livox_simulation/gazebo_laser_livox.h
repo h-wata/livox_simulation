@@ -57,7 +57,7 @@ private:
   typedef ignition::math::Quaterniond Q3;
 #else
   typedef math::Vector3 V3;
-  typedef math::Pose3 P3;
+  typedef math::Pose P3;
   typedef math::Quaternion Q3;
 #endif
   // Variables
