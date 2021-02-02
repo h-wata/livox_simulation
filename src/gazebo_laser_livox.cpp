@@ -3,7 +3,6 @@
 #include <tf/tf.h>
 #include <gazebo_plugins/gazebo_ros_utils.h>
 #include <sensor_msgs/point_cloud_conversion.h>
-#include "gazebo/physics/PhysicsTypes.hh"
 #include "livox_simulation/gazebo_laser_livox.h"
 
 namespace gazebo
@@ -37,7 +36,11 @@ void ArtiGazeboLaserLivox::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf
   this->parent_sensor_ = _parent;
   std::string worldName = _parent->WorldName();
   this->world_ = physics::get_world(worldName);
+#if GAZEBO_MAJOR_VERSION>=9
   this->engine_ = this->world_->Physics();
+#else
+  this->engine_ = this->world_->GetPhysicsEngine();
+#endif
   this->engine_->InitForThread();
   this->sdf = _sdf;
 
@@ -160,7 +163,6 @@ void ArtiGazeboLaserLivox::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf
   this->last_update_time_ = common::Time(0);
 
   this->parent_ray_sensor_->SetActive(true);
-  ROS_INFO("complete load controller");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -183,10 +185,6 @@ void ArtiGazeboLaserLivox::LoadThread()
 
     this->pub_ = this->rosnode_->advertise(ao);
 
-    // this->pub1_ = rosnode_->advertise<sensor_msgs::PointCloud>("laser_part1", 1);
-    // this->pub2_ = rosnode_->advertise<sensor_msgs::PointCloud>("laser_part2", 1);
-    // this->pub3_ = rosnode_->advertise<sensor_msgs::PointCloud>("laser_part3", 1);
-    // this->pub4_ = rosnode_->advertise<sensor_msgs::PointCloud>("laser_part4", 1);
   }
 
   this->parent_ray_sensor_->SetActive(false);
@@ -263,13 +261,18 @@ void ArtiGazeboLaserLivox::PutLaserData(common::Time &_updateTime)
   intensity.values.clear();
   intensity.name = "intensity";
 
-  ignition::math::Pose3d offset;
-  offset = this->collision_ptr_->RelativePose();
-  ignition::math::Vector3d offset_rot = offset.Rot().Euler();
+  P3 offset;
+  // offset = this->collision_ptr_->RelativePose();
+  offset = this->parent_ray_sensor_->Pose();
+  V3 offset_rot = GetEuler(GetQuaternion(offset));
 
-  ignition::math::Quaterniond rot_only;
-  rot_only.Euler(ignition::math::Vector3d(this->current_rot_angle_ + offset_rot.X(), offset_rot.Y(), offset_rot.Z()));
+  Q3 rot_only;
+  SetEuler(rot_only, V3(this->current_rot_angle_ + GetX(offset_rot), GetY(offset_rot), GetZ(offset_rot)));
+  #if GAZEBO_MAJOR_VERSION >= 8
   offset.Rot() = rot_only;
+  #else
+  offset.rot() = rot_only;
+  #endif
 
   bool has_prev_value = false;
  // ROS_ERROR_STREAM("num ellipses: " << this->double_ellipse_rays_.size());
@@ -330,9 +333,9 @@ void ArtiGazeboLaserLivox::PutLaserData(common::Time &_updateTime)
 
     for(int c = 0; c < 4; c++)
     {
-      ignition::math::Quaterniond ray;
-      ignition::math::Vector3d axis;
-      ignition::math::Vector3d endpoint;
+      Q3 ray;
+      V3 axis;
+      V3 endpoint;
       geometry_msgs::Point32 point, rot_point;
       // ROS_INFO_STREAM("c:" << c);
       for (int i = 0; i < quadrant_size[c]; i++)
@@ -340,12 +343,12 @@ void ArtiGazeboLaserLivox::PutLaserData(common::Time &_updateTime)
         float horizontal_ray_angle = horizon_angles[c][i];
         float vertical_ray_angle = vertical_angles[c][i];
         
-        // ray.Euler(ignition::math::Vector3d(0.0, -vertical_ray_angle, horizontal_ray_angle));
-        ray.Euler(ignition::math::Vector3d(0.0, -vertical_ray_angle, horizontal_ray_angle));
+        // ray.Euler(V3(0.0, -vertical_ray_angle, horizontal_ray_angle));
+        SetEuler(ray, V3(0.0, -vertical_ray_angle, horizontal_ray_angle));
         // axis = offset.rot * ray * math::Vector3(1.0, 0.0, 0.0);
-        // axis = ray * ignition::math::Vector3d(1.0, 0.0, 0.0);
-        axis = offset.Rot() * ray * ignition::math::Vector3d(1.0, 0.0, 0.0);
-        endpoint = (axis * this->max_range_) + offset.Pos();
+        // axis = ray * V3(1.0, 0.0, 0.0);
+        axis = GetQuaternion(offset) * ray * V3(1.0, 0.0, 0.0);
+        endpoint = (axis * this->max_range_) + GetPose(offset);
 
         quadrants[c][i]->SetPoints(this->ray_startpoint_, endpoint);
         if(i==0){
@@ -399,10 +402,6 @@ void ArtiGazeboLaserLivox::PutLaserData(common::Time &_updateTime)
     // Publish ROS-pointcloud
     this->pub_.publish(this->pc2_msgs_);
 
-    /*this->pub1_.publish(this->cloud1_msg_);
-    this->pub2_.publish(this->cloud2_msg_);
-    this->pub3_.publish(this->cloud3_msg_);
-    this->pub4_.publish(this->cloud4_msg_);*/
   }
   this->parent_ray_sensor_->SetActive(true);
 }
@@ -431,10 +430,10 @@ bool ArtiGazeboLaserLivox::AddRayEllipseShape(double rotation_degrees)
   double ell_a = 0.1746; // length of ellipse parameter a in a distance of 1 m with a FOV of 38.4°
   double ell_b = 0.0364; // length of ellipse parameter b in a distance of 1 m with a FOV of 38.4°
   double dx = 2.0 * ell_a / samples_a;
-  ignition::math::Quaterniond ray;
-  ignition::math::Vector3d axis;
-  ignition::math::Pose3d offset;
-  ignition::math::Vector3d start, end1, end2, end3, end4;
+  Q3 ray;
+  V3 axis;
+  P3 offset;
+  V3 start, end1, end2, end3, end4;
   livox::RayData eight_ray_pattern;
 
   start.Set(0.0, 0.0, 0.0);
@@ -446,19 +445,21 @@ bool ArtiGazeboLaserLivox::AddRayEllipseShape(double rotation_degrees)
   {
     this->multi_rays_->AddRay(start, end1);
   }
-  this->collision_ptr_ = this->engine_->CreateCollision("ray", parent_name);
-  this->collision_ptr_->SetName("own_ray_sensor_collision");
-  this->sensor_pose_ = this->parent_ray_sensor_->Pose();
-  this->collision_ptr_->SetRelativePose(this->sensor_pose_);
-  this->collision_ptr_->SetInitialRelativePose(this->sensor_pose_);
-
-  offset = this->collision_ptr_->RelativePose();
-  ignition::math::Vector3d offset_rot = offset.Rot().Euler();
-  ray.Euler(offset_rot);
-  axis = offset.Rot() * ray * ignition::math::Vector3d(1.0, 0.0, 0.0);
+  // this->collision_ptr_ = this->engine_->CreateCollision("ray", parent_name);
+  // this->collision_ptr_->SetName("own_ray_sensor_collision");
+  // this->sensor_pose_ = this->parent_ray_sensor_->Pose();
+  // this->collision_ptr_->SetRelativePose(this->sensor_pose_);
+  // this->collision_ptr_->SetInitialRelativePose(this->sensor_pose_);
+  // 
+  // offset = this->collision_ptr_->RelativePose();
+  offset = this->parent_ray_sensor_->Pose();
+  // V3 offset_rot = offset.Rot().Euler();
+  V3 offset_rot = GetEuler(GetQuaternion(offset));
+  SetEuler(ray, offset_rot);
+  axis = GetQuaternion(offset) * ray * V3(1.0, 0.0, 0.0);
 
   // Get the position of the pose of the parent_ray_sensor and add its position to the new ray (its relative to the parent-frame)
-  start = (axis * this->min_range_) + offset.Pos();
+  start = (axis * this->min_range_) + GetPose(offset);
   this->ray_startpoint_ = start;
 
 
@@ -535,58 +536,62 @@ bool ArtiGazeboLaserLivox::AddRayEllipseShape(double rotation_degrees)
     //       Therefore we need to map the y-axis of the ellipse to the Ray-z-axis and the x-axis of the ellipse to the
     //       -Ray-y-axis.
 
-    end1.X(1.0 + offset.Pos().X());
-    end1.Y(-ell_x1 + offset.Pos().Y());
-    end1.Z(ell_y1 + offset.Pos().Z());
+    end1.X(1.0 + GetX(GetPose(offset)));
+    end1.Y(-ell_x1 + GetY(GetPose(offset)));
+    end1.Z(ell_y1 + GetZ(GetPose(offset)));
 
-    end2.X(1.0 + offset.Pos().X());
-    end2.Y(-ell_x2 + offset.Pos().Y());
-    end2.Z(ell_y2 + offset.Pos().Z());
+    end2.X(1.0 + GetX(GetPose(offset)));
+    end2.Y(-ell_x2 + GetY(GetPose(offset)));
+    end2.Z(ell_y2 + GetZ(GetPose(offset)));
 
-    end3.X(1.0 + offset.Pos().X());
-    end3.Y(-ell_x3 + offset.Pos().Y());
-    end3.Z(ell_y3 + offset.Pos().Z());
+    end3.X(1.0 + GetX(GetPose(offset)));
+    end3.Y(-ell_x3 + GetY(GetPose(offset)));
+    end3.Z(ell_y3 + GetZ(GetPose(offset)));
 
-    end4.X(1.0 + offset.Pos().X());
-    end4.Y(-ell_x4 + offset.Pos().Y());
-    end4.Z(ell_y4 + offset.Pos().Z());
+    end4.X(1.0 + GetX(GetPose(offset)));
+    end4.Y(-ell_x4 + GetY(GetPose(offset)));
+    end4.Z(ell_y4 + GetZ(GetPose(offset)));
 
-    double beta1 = (atan2(end1.Y() - start.Y(), end1.X() - start.X()));
-    double beta2 = (atan2(end2.Y() - start.Y(), end2.X() - start.X()));
-    double beta3 = (atan2(end3.Y() - start.Y(), end3.X() - start.X()));
-    double beta4 = (atan2(end4.Y() - start.Y(), end4.X() - start.X()));
-    double alpha1 = (atan2(end1.Z() - start.Z(), end1.X() - start.X()));
-    double alpha2 = (atan2(end2.Z() - start.Z(), end2.X() - start.X()));
-    double alpha3 = (atan2(end3.Z() - start.Z(), end3.X() - start.X()));
-    double alpha4 = (atan2(end4.Z() - start.Z(), end4.X() - start.X()));
+    double beta1 = (atan2(GetY(end1) - GetY(start), GetX(end1) - GetX(start)));
+    double beta2 = (atan2(GetY(end2) - GetY(start), GetX(end2) - GetX(start)));
+    double beta3 = (atan2(GetY(end3) - GetY(start), GetX(end3) - GetX(start)));
+    double beta4 = (atan2(GetY(end4) - GetY(start), GetX(end4) - GetX(start)));
+    double alpha1 = (atan2(GetZ(end1) - GetZ(start), GetX(end1) - GetX(start)));
+    double alpha2 = (atan2(GetZ(end2) - GetZ(start), GetX(end2) - GetX(start)));
+    double alpha3 = (atan2(GetZ(end3) - GetZ(start), GetX(end3) - GetX(start)));
+    double alpha4 = (atan2(GetZ(end4) - GetZ(start), GetX(end4) - GetX(start)));
 
-    end1.X((1.0 + offset.Pos().X()) * this->max_range_);
-    end1.Y((-ell_x1 + offset.Pos().Y()) * this->max_range_);
-    end1.Z((ell_y1 + offset.Pos().Z()) * this->max_range_);
-    ray.Euler(ignition::math::Vector3d(0.0 + offset_rot.X(), -alpha1 + offset_rot.Y(), beta1 + offset_rot.Z()));
-    axis = offset.Rot() * ray * ignition::math::Vector3d(1.0, 0.0, 0.0);
-    end1 = (axis * this->max_range_) + offset.Pos();
+    end1.X((1.0 + GetX(GetPose(offset))) * this->max_range_);
+    end1.Y((-ell_x1 + GetY(GetPose(offset))) * this->max_range_);
+    end1.Z((ell_y1 + GetZ(GetPose(offset))) * this->max_range_);
+    // ray.Euler(V3(0.0 + GetX(offset_rot), -alpha1 + GetY(offset_rot), beta1 + GetZ(offset_rot)));
+    SetEuler(ray, V3(0.0 + GetX(offset_rot), -alpha1 + GetY(offset_rot), beta1 + GetZ(offset_rot)));
+    axis = GetQuaternion(offset) * ray * V3(1.0, 0.0, 0.0);
+    end1 = (axis * this->max_range_) + GetPose(offset);
 
-    end2.X((1.0 + offset.Pos().X()) * this->max_range_);
-    end2.Y((-ell_x2 + offset.Pos().Y()) * this->max_range_);
-    end2.Z((ell_y2 + offset.Pos().Z()) * this->max_range_);
-    ray.Euler(ignition::math::Vector3d(0.0 + offset_rot.X(), -alpha2 + offset_rot.Y(), beta2 + offset_rot.Z()));
-    axis = offset.Rot() * ray * ignition::math::Vector3d(1.0, 0.0, 0.0);
-    end2 = (axis * this->max_range_) + offset.Pos();
+    end2.X((1.0 + GetX(GetPose(offset))) * this->max_range_);
+    end2.Y((-ell_x2 + GetY(GetPose(offset))) * this->max_range_);
+    end2.Z((ell_y2 + GetZ(GetPose(offset))) * this->max_range_);
+    // ray.Euler(V3(0.0 + GetX(offset_rot), -alpha2 + GetY(offset_rot), beta2 + GetZ(offset_rot)));
+    SetEuler(ray, V3(0.0 + GetX(offset_rot), -alpha2 + GetY(offset_rot), beta2 + GetZ(offset_rot)));
+    axis = GetQuaternion(offset) * ray * V3(1.0, 0.0, 0.0);
+    end2 = (axis * this->max_range_) + GetPose(offset);
 
-    end3.X((1.0 + offset.Pos().X()) * this->max_range_);
-    end3.Y((-ell_x3 + offset.Pos().Y()) * this->max_range_);
-    end3.Z((ell_y3 + offset.Pos().Z()) * this->max_range_);
-    ray.Euler(ignition::math::Vector3d(0.0 + offset_rot.X(), -alpha3 + offset_rot.Y(), beta3 + offset_rot.Z()));
-    axis = offset.Rot() * ray * ignition::math::Vector3d(1.0, 0.0, 0.0);
-    end3 = (axis * this->max_range_) + offset.Pos();
+    end3.X((1.0 + GetX(GetPose(offset))) * this->max_range_);
+    end3.Y((-ell_x3 + GetY(GetPose(offset))) * this->max_range_);
+    end3.Z((ell_y3 + GetZ(GetPose(offset))) * this->max_range_);
+    // ray.Euler(V3(0.0 + GetX(offset_rot), -alpha3 + GetY(offset_rot), beta3 + GetZ(offset_rot)));
+    SetEuler(ray, V3(0.0 + GetX(offset_rot), -alpha3 + GetY(offset_rot), beta3 + GetZ(offset_rot)));
+    axis = GetQuaternion(offset) * ray * V3(1.0, 0.0, 0.0);
+    end3 = (axis * this->max_range_) + GetPose(offset);
 
-    end4.X((1.0 + offset.Pos().X()) * this->max_range_);
-    end4.Y((-ell_x4 + offset.Pos().Y()) * this->max_range_);
-    end4.Z((ell_y4 + offset.Pos().Z()) * this->max_range_);
-    ray.Euler(ignition::math::Vector3d(0.0 + offset_rot.X(), -alpha4 + offset_rot.Y(), beta4 + offset_rot.Z()));
-    axis = offset.Rot() * ray * ignition::math::Vector3d(1.0, 0.0, 0.0);
-    end4 = (axis * this->max_range_) + offset.Pos();
+    end4.X((1.0 + GetX(GetPose(offset))) * this->max_range_);
+    end4.Y((-ell_x4 + GetY(GetPose(offset))) * this->max_range_);
+    end4.Z((ell_y4 + GetZ(GetPose(offset))) * this->max_range_);
+    // ray.Euler(V3(0.0 + GetX(offset_rot), -alpha4 + GetY(offset_rot), beta4 + GetZ(offset_rot)));
+    SetEuler(ray, V3(0.0 + GetX(offset_rot), -alpha4 + GetY(offset_rot), beta4 + GetZ(offset_rot)));
+    axis = GetQuaternion(offset) * ray * V3(1.0, 0.0, 0.0);
+    end4 = (axis * this->max_range_) + GetPose(offset);
 
     std::string parent_name = this->parent_ray_sensor_->ParentName();
     //this->parent_ray_sensor_->LaserShape()->shared_from_this();
@@ -595,46 +600,6 @@ bool ArtiGazeboLaserLivox::AddRayEllipseShape(double rotation_degrees)
     this->multi_rays_->SetRay(2, start, end3);
     this->multi_rays_->SetRay(3, start, end4);
 
-//     physics::CollisionPtr collision_ptr_1 = this->engine_->CreateCollision("ray", parent_name);
-//     collision_ptr_1->SetName("own_ray_sensor_collision1");
-//     collision_ptr_1->SetRelativePose(this->sensor_pose_);
-// //    collision_ptr_list_.push_back(coalision_ptr_1);
-//     collision_1_elements.push_back(collision_ptr_1);
-// 
-//     gazebo::physics::RayShapePtr ray1 = boost::dynamic_pointer_cast<gazebo::physics::RayShape>(
-//       collision_ptr_1->GetShape());
-// 
-//     physics::CollisionPtr collision_ptr_2 = this->engine_->CreateCollision("ray", parent_name);
-//     collision_ptr_2->SetName("own_ray_sensor_collision2");
-//     collision_ptr_2->SetRelativePose(this->sensor_pose_);
-// //    collision_ptr_list_.push_back(collision_ptr_2);
-//     collision_2_elements.push_back(collision_ptr_2);
-// 
-//     gazebo::physics::RayShapePtr ray2 = boost::dynamic_pointer_cast<gazebo::physics::RayShape>(
-//       collision_ptr_2->GetShape());
-// 
-//     physics::CollisionPtr collision_ptr_3 = this->engine_->CreateCollision("ray", parent_name);
-//     collision_ptr_3->SetName("own_ray_sensor_collision3");
-//     collision_ptr_3->SetRelativePose(this->sensor_pose_);
-// //    collision_ptr_list_.push_back(collision_ptr_3);
-//     collision_3_elements.push_back(collision_ptr_3);
-// 
-//     gazebo::physics::RayShapePtr ray3 = boost::dynamic_pointer_cast<gazebo::physics::RayShape>(
-//       collision_ptr_3->GetShape());
-// 
-//     physics::CollisionPtr collision_ptr_4 = this->engine_->CreateCollision("ray", parent_name);
-//     collision_ptr_4->SetName("own_ray_sensor_collision4");
-//     collision_ptr_4->SetRelativePose(this->sensor_pose_);
-// //    collision_ptr_list_.push_back(collision_ptr_4);
-//     collision_4_elements.push_back(collision_ptr_4);
-// 
-//     gazebo::physics::RayShapePtr ray4 = boost::dynamic_pointer_cast<gazebo::physics::RayShape>(
-//       collision_ptr_4->GetShape());
-// // 
-//     ray1->SetPoints(start, end1);
-//     ray2->SetPoints(start, end2);
-//     ray3->SetPoints(start, end3);
-//     ray4->SetPoints(start, end4);
 
     this->multi_rays_->Ray(0)->SetName("ray_sensor_1");
     this->multi_rays_->Ray(1)->SetName("ray_sensor_2");
@@ -645,10 +610,6 @@ bool ArtiGazeboLaserLivox::AddRayEllipseShape(double rotation_degrees)
     rays_3.push_back(this->multi_rays_->Ray(2));
     rays_4.push_back(this->multi_rays_->Ray(3));
     this->multi_rays_->Reset();
-//    this->rays_.push_back(ray1);
-//    this->rays_.push_back(ray2);
-//    this->rays_.push_back(ray3);
-//    this->rays_.push_back(ray4);
 
     // Push back the angles that are not transformed due to the pose because we create the pointcloud from the local frame.
     // The psoe-orientation only plays a part in setting the ray-positions.
@@ -662,14 +623,6 @@ bool ArtiGazeboLaserLivox::AddRayEllipseShape(double rotation_degrees)
     alpha_3_values.push_back(alpha3);
     alpha_4_values.push_back(alpha4);
 
-//    this->horizontal_ray_angles_.push_back(float(beta1));
-//    this->horizontal_ray_angles_.push_back(float(beta2));
-//    this->horizontal_ray_angles_.push_back(float(beta3));
-//    this->horizontal_ray_angles_.push_back(float(beta4));
-//    this->vertical_ray_angles_.push_back(float(alpha1));
-//    this->vertical_ray_angles_.push_back(float(alpha2));
-//    this->vertical_ray_angles_.push_back(float(alpha3));
-//    this->vertical_ray_angles_.push_back(float(alpha4));
   }
   ROS_INFO("Complete Set Rays");
 
@@ -677,35 +630,29 @@ bool ArtiGazeboLaserLivox::AddRayEllipseShape(double rotation_degrees)
   {
     this->horizontal_ray_angles_.push_back(beta_1_values[i]);
     this->vertical_ray_angles_.push_back(alpha_1_values[i]);
-    // this->collision_ptr_list_.push_back(collision_1_elements[i]);
-    // this->rays_.push_back(rays_1[i]);
     eight_ray_pattern.left_upper_horizontal_ray_angles_.push_back(beta_1_values[i]);
     eight_ray_pattern.left_upper_vertical_ray_angles_.push_back(alpha_1_values[i]);
-    // ROS_ERROR_STREAM("addLeftUpperQuadrant" << i);
     eight_ray_pattern.addLeftUpperQuadrant(rays_1[i]);
+    // ROS_ERROR_STREAM("addLeftUpperQuadrant" << i);
   }
 
   for (size_t i = 0; i < beta_3_values.size(); ++i)
   {
     this->horizontal_ray_angles_.push_back(beta_3_values[i]);
     this->vertical_ray_angles_.push_back(alpha_3_values[i]);
-    // this->collision_ptr_list_.push_back(collision_3_elements[i]);
-    // this->rays_.push_back(rays_3[i]);
     eight_ray_pattern.right_upper_horizontal_ray_angles_.push_back(beta_3_values[i]);
     eight_ray_pattern.right_upper_vertical_ray_angles_.push_back(alpha_3_values[i]);
-    //ROS_ERROR("addRightUpperQuadrant");
     eight_ray_pattern.addRightUpperQuadrant(rays_3[i]);
+    //ROS_ERROR("addRightUpperQuadrant");
   }
   for (size_t i = 0; i < beta_2_values.size(); ++i)
   {
     this->horizontal_ray_angles_.push_back(beta_2_values[i]);
     this->vertical_ray_angles_.push_back(alpha_2_values[i]);
-    // this->collision_ptr_list_.push_back(collision_2_elements[i]);
     eight_ray_pattern.left_lower_horizontal_ray_angles_.push_back(beta_2_values[i]);
     eight_ray_pattern.left_lower_vertical_ray_angles_.push_back(alpha_2_values[i]);
     eight_ray_pattern.addLeftLowerQuadrant(rays_2[i]);
     //ROS_ERROR("addLeftLowerQuadrant");
-    // this->rays_.push_back(rays_2[i]);
   }
 
   for (size_t i = 0; i < beta_4_values.size(); ++i)
@@ -715,8 +662,6 @@ bool ArtiGazeboLaserLivox::AddRayEllipseShape(double rotation_degrees)
     eight_ray_pattern.right_lower_horizontal_ray_angles_.push_back(beta_4_values[i]);
     eight_ray_pattern.right_lower_vertical_ray_angles_.push_back(alpha_4_values[i]);
     eight_ray_pattern.addRightLowerQuadrant(rays_4[i]);
-    // this->collision_ptr_list_.push_back(collision_4_elements[i]);
-    // this->rays_.push_back(rays_4[i]);
     //ROS_ERROR("addRightLowerQuadrant");
   }
   //--------------------------------------------------------------------------------------------------------------------
