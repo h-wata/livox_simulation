@@ -68,6 +68,7 @@ private:
   ros::NodeHandle* rosnode_;
   ros::Publisher pub_;
   std::string topic_name_;
+  std::string sensor_type_;
   std::string frame_name_;
   double update_rate_;
   double update_period_;

@@ -71,6 +71,14 @@ void ArtiGazeboLaserLivox::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sdf
   else
     this->topic_name_ = this->sdf->Get<std::string>("topicName");
 
+  if (!this->sdf->HasElement("sensorType"))
+  {
+    ROS_INFO_NAMED("livox", "Livox-plugin parameter <sensorType> is missing, defaults to mid40");
+    this->sensor_type_ = "mid40";
+  }
+  else
+    this->sensor_type_ = this->sdf->Get<std::string>("sensorType");
+
   if (!this->sdf->HasElement("updateRate"))
   {
     ROS_INFO_NAMED("livox", "Livox-plugin parameter <updateRate> is missing, defaults to 0");
@@ -427,8 +435,20 @@ void ArtiGazeboLaserLivox::LaserQueueThread()
 bool ArtiGazeboLaserLivox::AddRayEllipseShape(double rotation_degrees)
 {
   double samples_a = this->samples_;
-  double ell_a = 0.3501; // length of ellipse parameter a in a distance of 1 m with a FOV of 70°
-  double ell_b = 0.0728; // length of ellipse parameter b in a distance of 1 m with a FOV of 70°
+  double ell_a, ell_b; 
+
+  if (this->sensor_type_ == "mid70")
+  {
+    ell_a = 0.3501;  // length of ellipse parameter a in a distance of 1 m with a FOV of 70°
+    ell_b = 0.0728;  // length of ellipse parameter b in a distance of 1 m with a FOV of 70°
+  }
+  else
+  {
+    // for Mid 40
+    ell_a = 0.1746;  // length of ellipse parameter a in a distance of 1 m with a FOV of 38.4°
+    ell_b = 0.0364;  // length of ellipse parameter b in a distance of 1 m with a FOV of 38.4°
+  }
+
   double dx = 2.0 * ell_a / samples_a;
   Q3 ray;
   V3 axis;
