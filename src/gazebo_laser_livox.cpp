@@ -427,8 +427,8 @@ void ArtiGazeboLaserLivox::LaserQueueThread()
 bool ArtiGazeboLaserLivox::AddRayEllipseShape(double rotation_degrees)
 {
   double samples_a = this->samples_;
-  double ell_a = 0.1746; // length of ellipse parameter a in a distance of 1 m with a FOV of 38.4°
-  double ell_b = 0.0364; // length of ellipse parameter b in a distance of 1 m with a FOV of 38.4°
+  double ell_a = 0.3501; // length of ellipse parameter a in a distance of 1 m with a FOV of 70°
+  double ell_b = 0.0728; // length of ellipse parameter b in a distance of 1 m with a FOV of 70°
   double dx = 2.0 * ell_a / samples_a;
   Q3 ray;
   V3 axis;
@@ -599,11 +599,6 @@ bool ArtiGazeboLaserLivox::AddRayEllipseShape(double rotation_degrees)
     this->multi_rays_->SetRay(2, start, end3);
     this->multi_rays_->SetRay(3, start, end4);
 
-
-    this->multi_rays_->Ray(0)->SetName("ray_sensor_1");
-    this->multi_rays_->Ray(1)->SetName("ray_sensor_2");
-    this->multi_rays_->Ray(2)->SetName("ray_sensor_3");
-    this->multi_rays_->Ray(3)->SetName("ray_sensor_4");
     rays_1.push_back(this->multi_rays_->Ray(0));
     rays_2.push_back(this->multi_rays_->Ray(1));
     rays_3.push_back(this->multi_rays_->Ray(2));
